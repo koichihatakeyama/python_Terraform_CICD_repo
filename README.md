@@ -18,4 +18,4 @@ GitHubにpushしたタイミングで、CodePipeline→CodeBuild→Lambdaまで�
 - GitHub Actions、CodePipeline、CodeBuildを順番に整える。
 - LambdaのPythonコードとテストの書き方をまとめる。
 
-ざっくりこんな方針で進めます。細かいところは作業しながら固める。
+細かいところは作業しながら固める。
