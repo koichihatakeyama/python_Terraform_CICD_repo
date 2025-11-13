@@ -22,3 +22,21 @@ variable "artifact_bucket_base" {
   type        = string
   default     = "python-terraform-cicd-artifact"
 }
+
+variable "lambda_runtime" {
+  description = "Lambdaのランタイム"
+  type        = string
+  default     = "python3.11"
+}
+
+variable "lambda_timeout" {
+  description = "Lambdaのタイムアウト秒"
+  type        = number
+  default     = 10
+}
+
+variable "lambda_memory_size" {
+  description = "Lambdaのメモリ(MB)"
+  type        = number
+  default     = 128
+}

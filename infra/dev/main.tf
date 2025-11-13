@@ -1,9 +1,11 @@
 # CodeBuildとS3で使う共通名をまとめる
 locals {
-  name_prefix    = "${var.project_name}-${var.environment}"
-  codebuild_name = "${var.project_name}-${var.environment}-build"
-  codedeploy_app = "${var.project_name}-${var.environment}-codedeploy"
-  codedeploy_dg  = "${var.project_name}-${var.environment}-deployment"
+  name_prefix       = "${var.project_name}-${var.environment}"
+  codebuild_name    = "${var.project_name}-${var.environment}-build"
+  codedeploy_app    = "${var.project_name}-${var.environment}-codedeploy"
+  codedeploy_dg     = "${var.project_name}-${var.environment}-deployment"
+  lambda_name       = "${var.project_name}-${var.environment}-lambda"
+  lambda_alias_name = "live"
 }
 
 # CodePipeline成果物用のS3バケット
@@ -156,6 +158,68 @@ resource "aws_codebuild_project" "lambda_package" {
     Environment = var.environment
     Project     = var.project_name
   }
+}
+
+# Lambda用サービスロール
+resource "aws_iam_role" "lambda" {
+  name = "${local.name_prefix}-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = {
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+# CloudWatch Logs出力用にAWS管理ポリシーを付与
+resource "aws_iam_role_policy_attachment" "lambda_basic" {
+  role       = aws_iam_role.lambda.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# ローカルのLambdaコードをZIP化
+data "archive_file" "lambda_package" {
+  type        = "zip"
+  source_dir  = "${path.module}/lambda_src"
+  output_path = "${path.module}/build/lambda.zip"
+}
+
+# Terraformが管理するLambda本体
+resource "aws_lambda_function" "app" {
+  function_name    = local.lambda_name
+  role             = aws_iam_role.lambda.arn
+  runtime          = var.lambda_runtime
+  handler          = "handler.lambda_handler"
+  filename         = data.archive_file.lambda_package.output_path
+  source_code_hash = data.archive_file.lambda_package.output_base64sha256
+  timeout          = var.lambda_timeout
+  memory_size      = var.lambda_memory_size
+  publish          = true
+
+  tags = {
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+# CodeDeployで制御するエイリアス
+resource "aws_lambda_alias" "active" {
+  name             = local.lambda_alias_name
+  description      = "Active alias managed by CodeDeploy"
+  function_name    = aws_lambda_function.app.function_name
+  function_version = aws_lambda_function.app.version
 }
 
 # CodeDeploy用サービスロール
