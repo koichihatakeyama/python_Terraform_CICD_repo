@@ -23,6 +23,28 @@ variable "artifact_bucket_base" {
   default     = "python-terraform-cicd-artifact"
 }
 
+variable "codestar_connection_arn" {
+  description = "CodeStar ConnectionsのARN"
+  type        = string
+}
+
+variable "github_full_repository_id" {
+  description = "GitHubのフルリポジトリID (例: owner/repo)"
+  type        = string
+}
+
+variable "github_branch" {
+  description = "CodePipelineで監視するブランチ名"
+  type        = string
+  default     = "main"
+}
+
+variable "pipeline_service_role_name" {
+  description = "CodePipelineのIAMロール名"
+  type        = string
+  default     = ""
+}
+
 variable "lambda_runtime" {
   description = "Lambdaのランタイム"
   type        = string

@@ -6,6 +6,8 @@ locals {
   codedeploy_dg     = "${var.project_name}-${var.environment}-deployment"
   lambda_name       = "${var.project_name}-${var.environment}-lambda"
   lambda_alias_name = "live"
+  pipeline_name     = "${var.project_name}-${var.environment}-pipeline"
+  pipeline_role_name = var.pipeline_service_role_name != "" ? var.pipeline_service_role_name : "${var.project_name}-${var.environment}-pipeline-role"
 }
 
 # CodePipeline成果物用のS3バケット
@@ -115,6 +117,18 @@ resource "aws_iam_role_policy" "codebuild" {
           aws_s3_bucket.artifact.arn,
           "${aws_s3_bucket.artifact.arn}/*"
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "lambda:GetAlias",
+          "lambda:PublishVersion",
+          "lambda:UpdateFunctionCode"
+        ]
+        Resource = [
+          aws_lambda_function.app.arn,
+          aws_lambda_alias.active.arn
+        ]
       }
     ]
   })
@@ -135,6 +149,14 @@ resource "aws_codebuild_project" "lambda_package" {
     environment_variable {
       name  = "AWS_DEFAULT_REGION"
       value = var.aws_region
+    }
+    environment_variable {
+      name  = "LAMBDA_FUNCTION_NAME"
+      value = local.lambda_name
+    }
+    environment_variable {
+      name  = "LAMBDA_ALIAS_NAME"
+      value = local.lambda_alias_name
     }
   }
 
@@ -277,6 +299,161 @@ resource "aws_codedeploy_deployment_group" "lambda" {
   auto_rollback_configuration {
     enabled = true
     events  = ["DEPLOYMENT_FAILURE"]
+  }
+
+  tags = {
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+# CodePipeline用サービスロール
+resource "aws_iam_role" "codepipeline" {
+  name = local.pipeline_role_name
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "codepipeline.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = {
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+# CodePipelineのアクセス権
+resource "aws_iam_role_policy" "codepipeline" {
+  name = "${local.name_prefix}-pipeline-policy"
+  role = aws_iam_role.codepipeline.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:GetObjectVersion",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:AbortMultipartUpload"
+        ]
+        Resource = [
+          aws_s3_bucket.artifact.arn,
+          "${aws_s3_bucket.artifact.arn}/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetBucketLocation"
+        ]
+        Resource = aws_s3_bucket.artifact.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "codebuild:BatchGetBuilds",
+          "codebuild:StartBuild"
+        ]
+        Resource = aws_codebuild_project.lambda_package.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "codedeploy:CreateDeployment",
+          "codedeploy:GetApplication",
+          "codedeploy:GetDeployment",
+          "codedeploy:GetDeploymentConfig",
+          "codedeploy:GetDeploymentGroup"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = "codestar-connections:UseConnection"
+        Resource = var.codestar_connection_arn
+      },
+      {
+        Effect = "Allow"
+        Action = "iam:PassRole"
+        Resource = aws_iam_role.codebuild.arn
+      }
+    ]
+  })
+}
+
+# CodePipeline本体
+resource "aws_codepipeline" "lambda" {
+  name     = local.pipeline_name
+  role_arn = aws_iam_role.codepipeline.arn
+
+  artifact_store {
+    location = aws_s3_bucket.artifact.bucket
+    type     = "S3"
+  }
+
+  stage {
+    name = "Source"
+
+    action {
+      name             = "Source"
+      category         = "Source"
+      owner            = "AWS"
+      provider         = "CodeStarSourceConnection"
+      version          = "1"
+      output_artifacts = ["SourceOutput"]
+      configuration = {
+        ConnectionArn        = var.codestar_connection_arn
+        FullRepositoryId     = var.github_full_repository_id
+        BranchName           = var.github_branch
+          OutputArtifactFormat = "CODE_ZIP"
+      }
+    }
+  }
+
+  stage {
+    name = "Build"
+
+    action {
+      name             = "Build"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput"]
+      output_artifacts = ["BuildOutput"]
+      configuration = {
+        ProjectName = aws_codebuild_project.lambda_package.name
+      }
+    }
+  }
+
+  stage {
+    name = "Deploy"
+
+    action {
+      name            = "Deploy"
+      category        = "Deploy"
+      owner           = "AWS"
+      provider        = "CodeDeploy"
+      version         = "1"
+      input_artifacts = ["BuildOutput"]
+      configuration = {
+        ApplicationName     = aws_codedeploy_app.lambda.name
+        DeploymentGroupName = aws_codedeploy_deployment_group.lambda.deployment_group_name
+      }
+    }
   }
 
   tags = {
