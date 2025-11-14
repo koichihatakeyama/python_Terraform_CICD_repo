@@ -123,7 +123,8 @@ resource "aws_iam_role_policy" "codebuild" {
         Action = [
           "lambda:GetAlias",
           "lambda:PublishVersion",
-          "lambda:UpdateFunctionCode"
+          "lambda:UpdateFunctionCode",
+          "lambda:GetFunctionConfiguration"
         ]
         Resource = [
           aws_lambda_function.app.arn,
@@ -273,6 +274,31 @@ resource "aws_iam_role_policy_attachment" "codedeploy_managed" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRoleForLambda"
 }
 
+# CodeDeployが成果物バケットを読み取れるよう許可
+resource "aws_iam_role_policy" "codedeploy_s3" {
+  name = "${local.name_prefix}-codedeploy-s3"
+  role = aws_iam_role.codedeploy.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:GetObjectVersion",
+          "s3:GetBucketLocation",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.artifact.arn,
+          "${aws_s3_bucket.artifact.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+
 # Lambda用CodeDeployアプリ
 resource "aws_codedeploy_app" "lambda" {
   name             = local.codedeploy_app
@@ -372,6 +398,7 @@ resource "aws_iam_role_policy" "codepipeline" {
         Effect = "Allow"
         Action = [
           "codedeploy:CreateDeployment",
+          "codedeploy:RegisterApplicationRevision",
           "codedeploy:GetApplication",
           "codedeploy:GetDeployment",
           "codedeploy:GetDeploymentConfig",

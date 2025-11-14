@@ -1,5 +1,5 @@
 def lambda_handler(event, context):
-    """シンプルな疎通確認用のLambdaハンドラー。"""
+    """疎通確認用Lambdaハンドラー。"""
     return {
         "statusCode": 200,
         "body": "ok"
