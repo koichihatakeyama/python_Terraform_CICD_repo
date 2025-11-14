@@ -173,7 +173,7 @@ resource "aws_codebuild_project" "lambda_package" {
 
   source {
     type      = "CODEPIPELINE"
-    buildspec = "buildspec.yml"
+    buildspec = "infra/dev/buildspec.yml"
   }
 
   tags = {

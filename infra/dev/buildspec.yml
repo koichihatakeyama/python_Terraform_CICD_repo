@@ -20,17 +20,18 @@ phases:
       - aws lambda update-function-code --function-name "$LAMBDA_FUNCTION_NAME" --zip-file fileb://lambda.zip
       - TARGET_VERSION=$(aws lambda publish-version --function-name "$LAMBDA_FUNCTION_NAME" --query 'Version' --output text)
       - echo "Published version: $TARGET_VERSION"
-      - cat <<EOF > appspec.yml
-version: 0.0
-Resources:
-  - LambdaFunction:
-      Type: AWS::Lambda::Function
-      Properties:
-        Name: ${LAMBDA_FUNCTION_NAME}
-        Alias: ${LAMBDA_ALIAS_NAME}
-        CurrentVersion: ${CURRENT_VERSION}
-        TargetVersion: ${TARGET_VERSION}
-EOF
+      - |
+        cat <<'EOF' > appspec.yml
+        version: 0.0
+        Resources:
+          - LambdaFunction:
+              Type: AWS::Lambda::Function
+              Properties:
+                Name: ${LAMBDA_FUNCTION_NAME}
+                Alias: ${LAMBDA_ALIAS_NAME}
+                CurrentVersion: ${CURRENT_VERSION}
+                TargetVersion: ${TARGET_VERSION}
+        EOF
       - cat appspec.yml
 artifacts:
   files:
