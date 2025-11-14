@@ -12,9 +12,7 @@ phases:
       - rm -rf package lambda.zip
       - mkdir -p package
       - cp -r infra/dev/lambda_src/. package/
-      - pushd package
-      - zip -r ../lambda.zip .
-      - popd
+      - '(cd package && zip -r ../lambda.zip .)'
       - CURRENT_VERSION=$(aws lambda get-alias --function-name "$LAMBDA_FUNCTION_NAME" --name "$LAMBDA_ALIAS_NAME" --query 'FunctionVersion' --output text 2>/dev/null || echo "0")
       - 'echo "Current alias version: $CURRENT_VERSION"'
       - aws lambda update-function-code --function-name "$LAMBDA_FUNCTION_NAME" --zip-file fileb://lambda.zip
