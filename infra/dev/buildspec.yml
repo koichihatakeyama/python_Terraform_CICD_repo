@@ -16,19 +16,19 @@ phases:
       - zip -r ../lambda.zip .
       - popd
       - CURRENT_VERSION=$(aws lambda get-alias --function-name "$LAMBDA_FUNCTION_NAME" --name "$LAMBDA_ALIAS_NAME" --query 'FunctionVersion' --output text 2>/dev/null || echo "0")
-      - echo "Current alias version: $CURRENT_VERSION"
+      - 'echo "Current alias version: $CURRENT_VERSION"'
       - aws lambda update-function-code --function-name "$LAMBDA_FUNCTION_NAME" --zip-file fileb://lambda.zip
       - TARGET_VERSION=$(aws lambda publish-version --function-name "$LAMBDA_FUNCTION_NAME" --query 'Version' --output text)
-      - echo "Published version: $TARGET_VERSION"
-      - echo "version: 0.0" > appspec.yml
-      - echo "Resources:" >> appspec.yml
-      - echo "  - LambdaFunction:" >> appspec.yml
-      - echo "      Type: AWS::Lambda::Function" >> appspec.yml
-      - echo "      Properties:" >> appspec.yml
-      - echo "        Name: ${LAMBDA_FUNCTION_NAME}" >> appspec.yml
-      - echo "        Alias: ${LAMBDA_ALIAS_NAME}" >> appspec.yml
-      - echo "        CurrentVersion: ${CURRENT_VERSION}" >> appspec.yml
-      - echo "        TargetVersion: ${TARGET_VERSION}" >> appspec.yml
+      - 'echo "Published version: $TARGET_VERSION"'
+      - 'echo "version: 0.0" > appspec.yml'
+      - 'echo "Resources:" >> appspec.yml'
+      - 'echo "  - LambdaFunction:" >> appspec.yml'
+      - 'echo "      Type: AWS::Lambda::Function" >> appspec.yml'
+      - 'echo "      Properties:" >> appspec.yml'
+      - 'echo "        Name: ${LAMBDA_FUNCTION_NAME}" >> appspec.yml'
+      - 'echo "        Alias: ${LAMBDA_ALIAS_NAME}" >> appspec.yml'
+      - 'echo "        CurrentVersion: ${CURRENT_VERSION}" >> appspec.yml'
+      - 'echo "        TargetVersion: ${TARGET_VERSION}" >> appspec.yml'
       - cat appspec.yml
 artifacts:
   files:
